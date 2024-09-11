@@ -42,19 +42,19 @@ add_executable(client ${SOURCE_DIR}/client.c)
 target_link_libraries(client zmq)
 
 #Запуск server и client
-add_custom_target(run_server
+add_custom_target(start_server
     COMMAND ./server
     DEPENDS server
     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/src
 )
 
-add_custom_target(run_client
+add_custom_target(start_client
     COMMAND ./client
     DEPENDS client
     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/src
 )
 
-add_custom_target(run_all
+add_custom_target(start_all
     COMMAND ./server &
     COMMAND ./client
     DEPENDS server client
