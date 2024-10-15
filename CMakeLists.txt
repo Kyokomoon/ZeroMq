@@ -31,12 +31,18 @@ execute_process(
 )
 
 
+#Установка libpcap
+execute_process(
+COMMAND sudo apt install -y libpcap-dev
+WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+)
+
 set(SOURCE_DIR ${CMAKE_SOURCE_DIR}/tests)
 set(EXECUTABLE_OUTPUT_PATH ${CMAKE_SOURCE_DIR}/src)
 
 #Компиляция server.c и client.c
 add_executable(server ${SOURCE_DIR}/server.c)
-target_link_libraries(server zmq)
+target_link_libraries(server zmq pcap)
 
 add_executable(client ${SOURCE_DIR}/client.c)
 target_link_libraries(client zmq)
