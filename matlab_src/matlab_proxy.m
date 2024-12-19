@@ -25,7 +25,19 @@ iter_set_dist = 0;
 global index_dl;
 index_dl = 1;
 global dist_list;
-dist_list = [10, 50, 100, 300, 500, 600, 1000];
+%dist_list = [10, 50, 100, 500, 1000, 4000];
+dist_list = [10, 100, 500, 1000, 2000, 3000, 5000, 100000, 150000, 200000, 250000, 300000];
+
+global noise_list;
+%noise_list = [10, -10, -30, -50, -70, -80, -90, -100, -110, -120, 40];
+%noise_list = [-110, -100, -90, -80, -70, -50, -30, -20, -10, 0];
+noise_list = [-100, -90, -80, -70];
+
+
+global iter_set_noise;
+iter_set_noise = 0;
+global index_noise_list;
+index_noise_list = 1;
 
 while true
     
@@ -35,12 +47,10 @@ while true
             % fprintf('received message [%d]\n', length(msg));
             if(length(msg) > 1000)
                 % process_data(msg);
-                % transmission_channel_model(msg);
-                msg = simulaion(msg);
+                msg = transmission_channel_model(msg);
+                % msg = simulaion(msg);
                 msg = convert_to_byte(msg);
                 % fprintf("send to proxe: %d\n", length(msg));
-                
-                % msg = complexToBytes(msg);
 
             end
             socket_api_proxy.send(msg);
@@ -49,10 +59,15 @@ while true
         pause(0.1);
     end
 end
+
+
+
 function togglePause()
     global pauseFlag;
     pauseFlag = ~pauseFlag;
 end
+
+
 function out_data = convert_to_byte(complex_array)
     single_array = single(complex_array);
     realPart = real(single_array);
@@ -76,96 +91,138 @@ function out_data = CostHata(data, h_enb, h_ue, d)
     
     % Расчет потерь сигнала
     L = 46.3 + 33.9 * log10(fc) - 13.82 * log10(hte) - a_hre + (44.9 - 6.55 * log10(hte)) * log10(d) + Cm;
-    out_data = data - L;
+    
+    % res = 10^(L/10);
+    fprintf("d = %d, L = %f\n", d, L);
+    out_data = data / L;
 end
+
+
 function out_data = simulaion(data_raw)
     global iter_set_dist;
     global index_dl;
     global dist_list;
-        
     data_slice = data_raw;
     floatArray = typecast(data_slice, 'single');
-    
     data = complex(floatArray(1:2:end), floatArray(2:2:end));
     % fprintf("size data = %d\n", length(data));
     CON = 2;
-    
     pos_ENB = [100, 200, 50];
     pos_UE = [200, 200, 1.5];
-    
-    
     iter_set_dist = iter_set_dist + 1;
     distance = 1;
     if iter_set_dist > 1000
         distance = dist_list(index_dl);
         fprintf("new distance: %d, index: %d\n", distance, index_dl);
         index_dl = index_dl + 1;
-
         if index_dl > length(dist_list)
-            index_dl = 1; 
+            index_dl = 1;
+            
         end
         iter_set_dist = 0;
     end
+    %distance = 400;
     if(CON == 1)
         distance = sqrt((pos_UE(1) - pos_ENB(1))^2 + (pos_UE(2) - pos_ENB(2))^2);
     end
+    %fprintf("dist = %f\n", distance);
     mu = 0; % Среднее значение
     sigma = distance; % Стандартное отклонение
     n = length(data); % Количество точек
-    
     % Генерация нормально распределённого шума
     noise = mu + sigma * randn(n, 1);
-    
     % Ограничение шума до ±100
     noise = max(min(noise, 100), -100);
     noise = noise + noise * 1i;
-
-    
+    % data_cost = CostHata(data, pos_ENB(3), pos_UE(3), distance);
     data_cost = data / (distance / 10) + noise;
-
     out_data = data_cost;
-
-    
+    % out_data = data;
+    %fprintf("data_cost = %f\n", data_cost);
 end
-
-function recovered_data_raw = complexToBytes(complexArray)
-    % Преобразует массив комплексных чисел обратно в массив байтов
-    % complexArray: Входной массив комплексных чисел
-    % recovered_data_raw: Выходной массив байтов (uint8)
-    
-    % Извлечение реальных и мнимых частей
-    recovered_floatArray = [real(complexArray); imag(complexArray)];
-    
-    % Объединение в одномерный массив
-    recovered_floatArray = recovered_floatArray(:); % Приводим к одномерному массиву
-    
-    % Преобразование обратно в байтовый массив
-    recovered_data_raw = typecast(recovered_floatArray, 'uint8');
-end
-
 
 function out_data = transmission_channel_model(data_raw)
+    global iter_set_dist;
+    global index_dl;
+    global dist_list;
+    global noise_list;
+    global iter_set_noise;
+    global index_noise_list;
 
     data_slice = data_raw;
-    floatArray = typecast(uint8(data_slice), 'single');
-    complexArray = complex(floatArray(1:2:end), floatArray(2:2:end)); 
-end
+    floatArray = typecast(data_slice, 'single');
+    data = complex(floatArray(1:2:end), floatArray(2:2:end));
+    %{
+    if iter_set_dist > 1000
+        distance = dist_list(index_dl);
+        fprintf("new distance: %d, index: %d\n", distance, index_dl);
+        index_dl = index_dl + 1;
+        if index_dl > length(dist_list)
+            index_dl = 1;
+            
+        end
+        iter_set_dist = 0;
+    end
+    %}
 
 
-
-function out_data = transmission_channel_model0(data, c, Nb, f0, Ts, D1, Dn, N0)
-    D = randi([D1, Dn], 1, Nb);
+    c = 3 * 1e8;
+    Nb = 20;
+    f0 = 2.56 * 1e9;
+    B = 23 * 1e6;
+    D1 = 10;
+    Dn = 200;
+    N0 = -100;
+    Ts = 1/B;
+    
+    
     PRINT_DEBUG_INFO = 0;
-    %Длинна сигнала
-    L = length(data);
-    fprintf("L = %d\n", L);
+
+    L = length(data); 
+    % fprintf("L = %d\n", L);
     Smpy = zeros(1, length(data));
+    
+    %
+    iter_set_dist = iter_set_dist + 1;
+    distance = dist_list(index_dl);
+    if iter_set_dist > 500
+        distance = dist_list(index_dl);
+        fprintf("new distance: %d, index: %d\n", distance, index_dl);
+        index_dl = index_dl + 1;
+        if index_dl > length(dist_list)
+            index_dl = length(dist_list);
+            
+        end
+        iter_set_dist = 0;
+    end
+    %
+    D = randi([D1, Dn], 1, Nb);
+    %{
+    iter_set_noise = iter_set_noise + 1;
+    N0 = noise_list(index_noise_list);
+    if iter_set_noise > 2000
+        N0 = noise_list(index_noise_list);
+        index_noise_list = index_noise_list + 1;
+        fprintf("new N0: %d, index: %d\n", N0, index_noise_list);
+        
+        if index_noise_list > length(noise_list)
+            index_noise_list = length(noise_list);
+        end
+        iter_set_noise = 0;
+
+    end
+    %}
+    distance = distance / 1000;
+    %data = CostHata(data, 50, 1, distance);
+
     for i = 1:Nb
         if PRINT_DEBUG_INFO
             fprintf("i = %d\n", i);
         end
         tau = round((D(i) - D1) / (c * Ts));
+        %fprintf("tau = %d\n", tau);
         G = c / (4 * pi * D(i) * f0);
+        %k = L + round(tau);
         Si = data;
         if PRINT_DEBUG_INFO
             %fprintf("Di = %d, tau = %d, G = %f\n", D(i), tau, G);
@@ -177,43 +234,29 @@ function out_data = transmission_channel_model0(data, c, Nb, f0, Ts, D1, Dn, N0)
                Si(k) = data(k - tau);
            end
         end
-        fprintf("Si\n");
-        for t = 1:length(Si)
-            fprintf("%g+%gi\t", real(Si(t)), imag(Si(t)));
-            if(mod(t, 8) == 0)
-                fprintf("\n");
-            end
-        end
-        
+        %}
         Si = Si .* G;
-        fprintf("\nSi * G\n");
-        for t = 1:length(Si)
-            fprintf("%g+%gi ", real(Si(t)), imag(Si(t)));
-            if(mod(t, 8) == 0)
-                fprintf("\n");
-            end
-        end
         if PRINT_DEBUG_INFO
+            %fprintf("len(Si) = %d\n", length(Si));
         end
         Smpy = sum_array(Smpy, Si);
+        % Smpy = Smpy + Si;
     end
-    fprintf("\nSmpy\n");
-    for t = 1:length(Smpy)
-        fprintf("%g+%gi ", real(Smpy(t)), imag(Smpy(t)));
-        if(mod(t, 4) == 0)
-            fprintf("\n");
-        end
-    end
+    
     n = transpose(wgn(length(Smpy), 1, N0));
-    if 0
-        
-        for t = 1:length(Smpy)
-            Smpy(t) = Smpy(t) + n(t);
-            Smpy(t) = Smpy(t) + (n(t) * 1i);
-            
-        end
-    else
-        %Smpy = Smpy + n + (n * 1i);
+    Smpy = Smpy + n + (n * 1i);
+
+    out_data = Smpy;
+end
+
+function res = sum_array(A, B)
+    A = A(:).';
+    B = B(:).';
+    min_len = min(length(A), length(B));
+    res = A(1:min_len) + B(1:min_len);
+    if length(A) > min_len
+        res = [res, A(min_len+1:end)];
+    elseif length(B) > min_len
+        res = [res, B(min_len+1:end)];
     end
-    out_data = Smpy;% + n;
 end
